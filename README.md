@@ -18,6 +18,10 @@ An unofficial PyTorch implementation of the **Transformer architecture** from [A
 
 A minimal PyTorch implementation of **Direct Preference Optimization (DPO)**, a simple alternative to RLHF for aligning language models with human preferences. It covers the two core pieces — computing per-sequence log-probabilities and the DPO preference loss — and ships with a self-contained demo. Based on [Direct Preference Optimization: Your Language Model is Secretly a Reward Model](https://arxiv.org/pdf/2305.18290).
 
+### [`grpo`](./grpo) — Group Relative Policy Optimization
+
+A minimal PyTorch implementation of **Group Relative Policy Optimization (GRPO)**, a memory-efficient variant of PPO that drops the value network and instead normalizes rewards within a group of sampled completions. It covers the core pieces — per-token log-probabilities, group-relative advantages, the KL-to-reference penalty, and the clipped surrogate loss — and ships with a self-contained demo. Based on [DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models](https://arxiv.org/pdf/2402.03300).
+
 
 
 ## License
