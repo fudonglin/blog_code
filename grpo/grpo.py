@@ -16,37 +16,23 @@ def get_per_token_logps(logits: Tensor, completions: Tensor) -> Tensor:
         completions: Token ids that were actually generated. Shape: (batch, seq_length)
 
     Returns:
-        Per-token log-probabilities log π(o_t | q, o_<t). Shape: (batch, seq_length)
+        Per-token log-probabilities log π(o_t | q, o_<t). Shape: (batch, seq_length - 1)
 
     Note:
-        For clarity this toy version assumes logits are already aligned with the
-        completion tokens. A real setup predicts the next token, so you would use
-        logits[:, :-1] against completions[:, 1:] (the same shift as in DPO).
+        A real setup predicts the next token, so you would use logits[:, :-1]
+        against completions[:, 1:] (the same shift as in DPO).
     """
     assert logits.shape[:-1] == completions.shape
 
-    # Pick the log-prob of the realized token at each position. Shape: (batch, seq_length).
+    # Shift by one so logits[:, t] aligns with completions[:, t+1] (next-token prediction).
+    completions = completions[:, 1:]   # (batch, seq_length - 1)
+    logits = logits[:, :-1, :]         # (batch, seq_length - 1, vocab_size)
+
+    # Pick the log-prob of the realized token at each position. Shape: (batch, seq_length - 1).
     per_token_logps = torch.gather(
         logits.log_softmax(-1), dim=2, index=completions.unsqueeze(2)
     ).squeeze(2)
     return per_token_logps
-
-
-def compute_kl_divergence(per_token_logps: Tensor, ref_per_token_logps: Tensor) -> Tensor:
-    """Unbiased (k3) per-token estimator of KL(π_θ || π_ref); always ≥ 0.
-
-    Args:
-        per_token_logps: Policy log-probs log π_θ(o_t). Shape: (batch, seq_length)
-        ref_per_token_logps: Reference log-probs log π_ref(o_t). Shape: (batch, seq_length)
-
-    Returns:
-        Per-token KL estimate. Shape: (batch, seq_length)
-    """
-    # log(π_ref / π_θ); positive when the reference favors the token more than the policy.
-    log_ratio = ref_per_token_logps - per_token_logps
-
-    # k3 estimator: exp(r) - r - 1 ≥ 0, low-variance and unbiased for the KL.
-    return torch.exp(log_ratio) - log_ratio - 1
 
 
 def compute_group_advantages(rewards: Tensor, group_size: int) -> Tensor:
@@ -72,6 +58,23 @@ def compute_group_advantages(rewards: Tensor, group_size: int) -> Tensor:
 
     # Flatten back to per-completion and add a token axis for broadcasting.
     return advantages.view(-1, 1)  # (B * G, 1)
+
+
+def compute_kl_divergence(per_token_logps: Tensor, ref_per_token_logps: Tensor) -> Tensor:
+    """Unbiased (k3) per-token estimator of KL(π_θ || π_ref); always ≥ 0.
+
+    Args:
+        per_token_logps: Policy log-probs log π_θ(o_t). Shape: (batch, seq_length)
+        ref_per_token_logps: Reference log-probs log π_ref(o_t). Shape: (batch, seq_length)
+
+    Returns:
+        Per-token KL estimate. Shape: (batch, seq_length)
+    """
+    # log(π_ref / π_θ); positive when the reference favors the token more than the policy.
+    log_ratio = ref_per_token_logps - per_token_logps
+
+    # k3 estimator: exp(r) - r - 1 ≥ 0, low-variance and unbiased for the KL.
+    return torch.exp(log_ratio) - log_ratio - 1
 
 
 def grpo_loss(per_token_logps: Tensor,
@@ -154,6 +157,9 @@ def main() -> None:
     positions = torch.arange(L).unsqueeze(0)                      # (1, L)
     completion_mask = (positions < lengths.unsqueeze(1)).float()  # (B*G, L)
 
+    # The next-token shift drops the first position, so align the mask the same way.
+    completion_mask = completion_mask[:, 1:]                      # (B*G, L - 1)
+
     print(f"completions     : {tuple(completions.shape)}  # (B*G, L)")
     print(f"rewards         : {tuple(rewards.shape)}        # (B*G,)")
     print(f"tokens per completion : {completion_mask.sum(-1).int().tolist()}")
@@ -168,9 +174,9 @@ def main() -> None:
     old_logits = torch.randn(BG, L, V)     # π_θ_old (frozen snapshot from generation)
     ref_logits = torch.randn(BG, L, V)     # π_ref  (frozen reference)
 
-    per_token_logps = get_per_token_logps(policy_logits, completions)        # (B*G, L)
-    old_per_token_logps = get_per_token_logps(old_logits, completions)       # (B*G, L)
-    ref_per_token_logps = get_per_token_logps(ref_logits, completions)       # (B*G, L)
+    per_token_logps = get_per_token_logps(policy_logits, completions)        # (B*G, L-1)
+    old_per_token_logps = get_per_token_logps(old_logits, completions)       # (B*G, L-1)
+    ref_per_token_logps = get_per_token_logps(ref_logits, completions)       # (B*G, L-1)
 
     for name, t in [
         ("per_token_logps", per_token_logps),
