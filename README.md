@@ -14,6 +14,10 @@ A from-scratch implementation of the **Byte Pair Encoding (BPE)** tokenizer from
 
 An unofficial PyTorch implementation of the **Transformer architecture** from [Attention Is All You Need](https://arxiv.org/pdf/1706.03762). It builds each component step-by-step — positional encoding, multi-head attention, position-wise feedforward networks, and the encoder/decoder stacks — and includes runnable training and inference examples for a machine translation task.
 
+### [`ppo`](./ppo) — Proximal Policy Optimization
+
+A minimal PyTorch implementation of **Proximal Policy Optimization (PPO)** for RLHF-style language-model fine-tuning. It covers the full pipeline — per-token log-probabilities, dense per-token rewards (outcome score minus a KL-to-reference penalty), a learned value baseline with Generalized Advantage Estimation (GAE), and the clipped policy and value losses — and ships with a self-contained demo. Unlike GRPO, PPO keeps the value network (critic). Based on [Proximal Policy Optimization Algorithms](https://arxiv.org/pdf/1707.06347).
+
 ### [`dpo`](./dpo) — Direct Preference Optimization
 
 A minimal PyTorch implementation of **Direct Preference Optimization (DPO)**, a simple alternative to RLHF for aligning language models with human preferences. It covers the two core pieces — computing per-sequence log-probabilities and the DPO preference loss — and ships with a self-contained demo. Based on [Direct Preference Optimization: Your Language Model is Secretly a Reward Model](https://arxiv.org/pdf/2305.18290).
